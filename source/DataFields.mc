@@ -720,12 +720,12 @@ class DataFields extends Ui.Drawable {
 
 		// Sun never rises.
 		if (cosOmega > 1) {
-			return [null, -1];
+			return [null, -1]  as Array<Number>;
 		}
 		
 		// Sun never sets.
 		if (cosOmega < -1) {
-			return [-1, null];
+			return [-1, null] as Array<Number>;
 		}
 		
 		// Calculate times from omega.
