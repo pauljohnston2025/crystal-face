@@ -64,6 +64,7 @@
 	<string id="HeartRate">Heart Rate</string>
 	<string id="HeartRateLive5s">Heart Rate (Live 5s)</string>
 	<string id="Battery">Battery</string>
+	<string id="Recovery">Recovery Time (h)</string>
 	<string id="BatteryHidePercentage">Battery (Hide Percentage)</string>
 	<string id="Notifications">Notifications</string>
 	<string id="Calories">Calories</string>
@@ -71,10 +72,13 @@
 	<string id="Alarms">Alarms</string>
 	<string id="Altitude">Altitude</string>
 	<string id="Temperature">Thermometer</string>
+	<string id="TemperatureC">Temperature from garmin (°C)</string>
+	<string id="TemperatureCNoC">Temperature from garmin in celcius (°)</string>
 	<string id="Bluetooth">Bluetooth</string>
 	<string id="BluetoothOrNotifications">Bluetooth/Notifications</string>
 	<string id="SunriseSunset">Sunrise/Sunset</string>
-	<string id="Weather">Weather</string>
+	<string id="Weather">Weather from OpenWeatherMap</string>
+	<string id="WeathGarmin">Weather from garmin</string>
 	<string id="Humidity">Humidity</string>
 	<string id="Pressure">Pressure</string>
 

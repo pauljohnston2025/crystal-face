@@ -93,14 +93,9 @@ class CrystalView extends Ui.WatchFace {
 	private var mBurnInProtectionChangedSinceLastDraw = false; // Did burn-in protection change since last full update?
 	private var mSettingsChangedSinceLastDraw = true; // Have settings changed since last full update?
 
-	private var mTime;
-	var mDataFields;
-
-	// Cache references to drawables immediately after layout, to avoid expensive findDrawableById() calls in onUpdate();
-	private var mDrawables as Dictionary<Symbol, Drawable> = {};
-
 	// N.B. Not all watches that support SDK 2.3.0 support per-second updates e.g. 735xt.
 	private const PER_SECOND_UPDATES_SUPPORTED = Ui.WatchFace has :onPartialUpdate;
+	private var mDrawableCache as DrawableCache;
 
 	// private enum /* THEMES */ {
 	// 	THEME_BLUE_DARK,
@@ -126,7 +121,8 @@ class CrystalView extends Ui.WatchFace {
 	// 	MONO = -3
 	// }
 
-	function initialize() {
+	function initialize(drawableCache as DrawableCache) {
+		mDrawableCache = drawableCache;
 		WatchFace.initialize();
 	}
 
@@ -139,24 +135,8 @@ class CrystalView extends Ui.WatchFace {
 	}
 
 	function cacheDrawables() {
-		mDrawables[:LeftGoalMeter] = View.findDrawableById("LeftGoalMeter");
-		mDrawables[:RightGoalMeter] = View.findDrawableById("RightGoalMeter");
-		mDrawables[:DataArea] = View.findDrawableById("DataArea");
-		mDrawables[:Indicators] = View.findDrawableById("Indicators");
-
-		// Use mTime instead.
-		// Cache reference to ThickThinTime, for use in low power mode. Saves nearly 5ms!
-		// Slighly faster than mDrawables lookup.
-		//mDrawables[:Time] = View.findDrawableById("Time");
-		mTime = View.findDrawableById("Time");
-
-		// Use mDataFields instead.
-		//mDrawables[:DataFields] = View.findDrawableById("DataFields");
-		mDataFields = View.findDrawableById("DataFields");
-
-		mDrawables[:MoveBar] = View.findDrawableById("MoveBar");
-
-		setHideSeconds(getPropertyValue("HideSeconds")); // Requires mTime, mDrawables[:MoveBar];
+		mDrawableCache.cacheDrawables(self);
+		setHideSeconds(getPropertyValue("HideSeconds")); // Requires mDrawableCache.mTime, mDrawableCache.mDrawables[:MoveBar];
 	}
 
 	/*
@@ -279,14 +259,14 @@ class CrystalView extends Ui.WatchFace {
 		if (!mIsBurnInProtection) {
 
 			// Recreate background buffers for each meter, in case theme colour has changed.	
-			(mDrawables[:LeftGoalMeter] as GoalMeter).onSettingsChanged();	
-			(mDrawables[:RightGoalMeter] as GoalMeter).onSettingsChanged();	
+			(mDrawableCache.mDrawables[:LeftGoalMeter] as GoalMeter).onSettingsChanged();	
+			(mDrawableCache.mDrawables[:RightGoalMeter] as GoalMeter).onSettingsChanged();	
 
-			(mDrawables[:MoveBar] as MoveBar).onSettingsChanged();	
+			(mDrawableCache.mDrawables[:MoveBar] as MoveBar).onSettingsChanged();	
 
-			mDataFields.onSettingsChanged();	
+			mDrawableCache.mDataFields.onSettingsChanged();	
 
-			(mDrawables[:Indicators] as Indicators).onSettingsChanged();
+			(mDrawableCache.mDrawables[:Indicators] as Indicators).onSettingsChanged();
 		}
 
 		// If watch does not support per-second updates, and watch is sleeping, do not show seconds immediately, as they will not 
@@ -304,7 +284,7 @@ class CrystalView extends Ui.WatchFace {
 
 		// If burn-in protection has changed, set layout appropriate to new burn-in protection state.
 		// If turning on burn-in protection, free memory for regular watch face drawables by clearing references. This means that
-		// any use of mDrawables cache must only occur when burn in protection is NOT active.
+		// any use of mDrawableCache.mDrawables cache must only occur when burn in protection is NOT active.
 		// If turning off burn-in protection, recache regular watch face drawables.
 		if (mBurnInProtectionChangedSinceLastDraw) {
 			mBurnInProtectionChangedSinceLastDraw = false;
@@ -336,13 +316,13 @@ class CrystalView extends Ui.WatchFace {
 
 		var leftType = getPropertyValue("LeftGoalType");
 		var leftValues = getValuesForGoalType(leftType);
-		(mDrawables[:LeftGoalMeter] as GoalMeter).setValues(leftValues[:current], leftValues[:max], /* isOff */ leftType == GOAL_TYPE_OFF);
+		(mDrawableCache.mDrawables[:LeftGoalMeter] as GoalMeter).setValues(leftValues[:current], leftValues[:max], /* isOff */ leftType == GOAL_TYPE_OFF);
 
 		var rightType = getPropertyValue("RightGoalType");
 		var rightValues = getValuesForGoalType(rightType);
-		(mDrawables[:RightGoalMeter] as GoalMeter).setValues(rightValues[:current], rightValues[:max], /* isOff */ rightType == GOAL_TYPE_OFF);
+		(mDrawableCache.mDrawables[:RightGoalMeter] as GoalMeter).setValues(rightValues[:current], rightValues[:max], /* isOff */ rightType == GOAL_TYPE_OFF);
 
-		(mDrawables[:DataArea] as DataArea).setGoalValues(leftType, leftValues, rightType, rightValues);
+		(mDrawableCache.mDrawables[:DataArea] as DataArea).setGoalValues(leftType, leftValues, rightType, rightValues);
 	}
 
 	function getValuesForGoalType(type) as GoalValues  {
@@ -413,8 +393,8 @@ class CrystalView extends Ui.WatchFace {
 	function onPartialUpdate(dc) {
 		//Sys.println("onPartialUpdate()");
 	
-		mDataFields.update(dc, /* isPartialUpdate */ true);
-		mTime.drawSeconds(dc, /* isPartialUpdate */ true);
+		mDrawableCache.mDataFields.update(dc, /* isPartialUpdate */ true);
+		mDrawableCache.mTime.drawSeconds(dc, /* isPartialUpdate */ true);
 	}
 
 	/*
@@ -482,15 +462,15 @@ class CrystalView extends Ui.WatchFace {
 	function setHideSeconds(hideSeconds) {
 
 		// #158 Venu 2.80 firmware crash: mIsBurnInProtection fails to be set in onEnterSleep(), hopefully because that function
-		// is now not called at startup before entering sleep, rather than because requiresBurnInProtection is not set. mTime will
+		// is now not called at startup before entering sleep, rather than because requiresBurnInProtection is not set. mDrawableCache.mTime will
 		// be null in always-on mode, so add additional safety check here.
 		// TODO: If Venu is guaranteed to start in always-on mode, we could initialise mIsBurnInProtection to true if
 		// requiresBurnInProtection is true.
-		if (mIsBurnInProtection || (mTime == null)) {
+		if (mIsBurnInProtection || (mDrawableCache.mTime == null)) {
 			return;
 		}
 
-		mTime.setHideSeconds(hideSeconds);
-		(mDrawables[:MoveBar] as MoveBar).setFullWidth(hideSeconds);
+		mDrawableCache.mTime.setHideSeconds(hideSeconds);
+		(mDrawableCache.mDrawables[:MoveBar] as MoveBar).setFullWidth(hideSeconds);
 	}
 }

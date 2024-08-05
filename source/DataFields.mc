@@ -8,6 +8,8 @@ using Toybox.SensorHistory as SensorHistory;
 
 using Toybox.Time;
 using Toybox.Time.Gregorian;
+using Toybox.Complications;
+using Toybox.Weather;
 
 import Toybox.Lang;
 
@@ -30,7 +32,8 @@ enum /* FIELD_TYPES */ {
 	FIELD_TYPE_SUNRISE_SUNSET,
 	FIELD_TYPE_WEATHER,
 	FIELD_TYPE_PRESSURE,
-	FIELD_TYPE_HUMIDITY
+	FIELD_TYPE_HUMIDITY,
+	FIELD_TYPE_WEATHER_GARMIN, // use garmin weather instead of open weather map
 }
 
 typedef FieldTypeValue as {
@@ -41,7 +44,9 @@ class DataFields extends Ui.Drawable {
 
 	private var mLeft;
 	private var mRight;
+	// icon centered vertically
 	private var mTop;
+	// text centered vertically
 	private var mBottom;
 
 	private var mWeatherIconsFont;
@@ -278,11 +283,12 @@ class DataFields extends Ui.Drawable {
 
 			var font;
 			var icon;
-			if (fieldType == FIELD_TYPE_WEATHER) {
+			if (fieldType == FIELD_TYPE_WEATHER || fieldType == FIELD_TYPE_WEATHER_GARMIN) {
 
 				// #83 Dynamic loading/unloading of day/night weather icons font, to save memory.
 				// If subset has changed since last draw, save new subset, and load appropriate font for it.
-				var weatherIconsSubset = (result["weatherIcon"] as String).substring(2, 3);
+				var weatherIcon = result["weatherIcon"];
+				var weatherIconsSubset = (weatherIcon).substring(2, 3);
 				if (!weatherIconsSubset.equals(mWeatherIconsSubset)) {
 					mWeatherIconsSubset = weatherIconsSubset;
 					mWeatherIconsFont = Ui.loadResource((mWeatherIconsSubset.equals("d")) ?
@@ -304,7 +310,7 @@ class DataFields extends Ui.Drawable {
 					"11d" => "C" /* 61445 */, "11n" => "b" /* 61477 */, // thunderstorm
 					"13d" => "F" /* 61450 */, "13n" => "e" /* 61482 */, // snow
 					"50d" => "A" /* 61441 */, "50n" => "a" /* 61475 */, // mist
-				}[result["weatherIcon"]];
+				}[weatherIcon];
 
 			} else {
 				font = gIconsFont;
@@ -330,6 +336,8 @@ class DataFields extends Ui.Drawable {
 					FIELD_TYPE_SUNRISE_SUNSET => "?",
 					FIELD_TYPE_PRESSURE => "@",
 					FIELD_TYPE_HUMIDITY => "A",
+
+					// FIELD_TYPE_WEATHER_GARMIN => "<",
 				}[fieldType];
 			}
 
@@ -595,7 +603,7 @@ class DataFields extends Ui.Drawable {
 					value = "...";
 				}
 				break;
-
+			
 			case FIELD_TYPE_PRESSURE:
 
 				// Avoid using ActivityInfo.ambientPressure, as this bypasses any manual pressure calibration e.g. on Fenix
@@ -623,6 +631,38 @@ class DataFields extends Ui.Drawable {
 					}
 				}
 				break;
+
+			case FIELD_TYPE_WEATHER_GARMIN:
+				// Default = sunshine!
+				if (type == FIELD_TYPE_WEATHER_GARMIN) {
+					result["weatherIcon"] = "01d";
+				}
+
+				var sunriseGarmin = Complications.getComplication(new Complications.Id(Complications.COMPLICATION_TYPE_SUNRISE)).value;
+				var sunsetGarmin = Complications.getComplication(new Complications.Id(Complications.COMPLICATION_TYPE_SUNSET)).value;
+				var weatherGarmin = Complications.getComplication(new Complications.Id(Complications.COMPLICATION_TYPE_CURRENT_WEATHER));
+				var temperatureGarmin = Complications.getComplication(new Complications.Id(Complications.COMPLICATION_TYPE_CURRENT_TEMPERATURE));
+				var isDay = true; // most likely to look at it during the day, so if we cannot get sunrise/sunset do that
+				if (sunriseGarmin != null && sunsetGarmin != null)
+				{
+					var midnightEpochS = Time.today().value();
+					var nowEpochS = Time.now().value();
+					var todaySeconds = nowEpochS - midnightEpochS;
+					if (todaySeconds < sunriseGarmin || todaySeconds > sunsetGarmin)
+					{
+						isDay = false;
+					}
+				}
+
+				var letterToAdd = isDay ? "d" : "n";
+				result["weatherIcon"] = getWeatherIconFromGarmin(weatherGarmin.value) + letterToAdd;
+
+				var temperatureVal = temperatureGarmin.value;
+				value = "...";
+				if (temperatureVal != null) {
+					value = temperatureVal.format("%.0f") + "°C";
+				}
+				break;	
 		}
 
 		result["value"] = value;
@@ -740,5 +780,238 @@ class DataFields extends Ui.Drawable {
 			/* localRise */ (deltaJRise * 24) + tzOffset,
 			/* localSet */ (deltaJSet * 24) + tzOffset
 		];
+	}
+
+	function handleTouch(x as Number, y as Number) as Boolean {
+		var fieldTypes = App.getApp().mFieldTypes;
+		var heightLimit = 11;
+		if (y < mTop - heightLimit || y > mBottom + heightLimit) {
+			return false;
+		}
+
+		switch (mFieldCount) {
+		case 3:
+			var middleX = (mRight + mLeft) / 2;
+			// field 1
+			if (x > mLeft - 11 && x < mLeft + 25 - 11) {
+				return launchFieldType(fieldTypes[0]);
+			}
+			// field 2
+			else if (x > middleX - 11 && x < middleX + 25 - 11) {
+				return launchFieldType(fieldTypes[1]);
+			}
+			// field 3
+			else if (x > mRight - 11 && x < mRight + 25 - 11) {
+				return launchFieldType(fieldTypes[2]);
+			}
+			return false;
+		case 2:
+			var leftX = mLeft + ((mRight - mLeft) * 0.15);
+			var rightX = mLeft + ((mRight - mLeft) * 0.85);
+			// field 1
+			if (x > leftX - 11 && x < leftX + 25 - 11) {
+				return launchFieldType(fieldTypes[0]);
+			}
+			// field 2
+			else if (x > rightX - 11 && x < rightX + 25 - 11) {
+				return launchFieldType(fieldTypes[1]);
+			}
+			return false;
+		case 1:
+			var xPos = (mRight + mLeft) / 2;
+			if (x > xPos - 11 && x < xPos + 25 - 11) {
+				return launchFieldType(fieldTypes[0]);
+			}
+			return false;
+		}
+
+		return false;
+	}
+
+	function launchFieldType(fieldType as Number) as Boolean {
+		switch (fieldType) {
+		case FIELD_TYPE_SUNRISE:
+			Complications.exitTo(
+				new Complications.Id(Complications.COMPLICATION_TYPE_SUNRISE));
+			return true;
+		case FIELD_TYPE_HEART_RATE:
+			Complications.exitTo(
+				new Complications.Id(Complications.COMPLICATION_TYPE_HEART_RATE));
+			return true;
+		case FIELD_TYPE_BATTERY:
+			Complications.exitTo(
+				new Complications.Id(Complications.COMPLICATION_TYPE_BATTERY));
+			return true;
+		case FIELD_TYPE_NOTIFICATIONS:
+			Complications.exitTo(new Complications.Id(
+				Complications.COMPLICATION_TYPE_NOTIFICATION_COUNT));
+			return true;
+		case FIELD_TYPE_CALORIES:
+			Complications.exitTo(
+				new Complications.Id(Complications.COMPLICATION_TYPE_CALORIES));
+			return true;
+		case FIELD_TYPE_DISTANCE:
+			Complications.exitTo(new Complications.Id(
+				Complications.COMPLICATION_TYPE_WEEKLY_RUN_DISTANCE));
+			return true;
+		case FIELD_TYPE_ALARMS:
+			return false;
+		case FIELD_TYPE_ALTITUDE:
+			Complications.exitTo(
+				new Complications.Id(Complications.COMPLICATION_TYPE_ALTITUDE));
+			return true;
+		case FIELD_TYPE_TEMPERATURE:
+			Complications.exitTo(new Complications.Id(
+				Complications.COMPLICATION_TYPE_CURRENT_TEMPERATURE));
+			return true;
+		case FIELD_TYPE_BATTERY_HIDE_PERCENT:
+			Complications.exitTo(
+				new Complications.Id(Complications.COMPLICATION_TYPE_BATTERY));
+			return true;
+		case FIELD_TYPE_HR_LIVE_5S:
+			Complications.exitTo(
+				new Complications.Id(Complications.COMPLICATION_TYPE_HEART_RATE));
+			return true;
+		case FIELD_TYPE_SUNRISE_SUNSET:
+			Complications.exitTo(
+				new Complications.Id(Complications.COMPLICATION_TYPE_SUNRISE));
+			return true;
+		case FIELD_TYPE_WEATHER:
+		case FIELD_TYPE_WEATHER_GARMIN:
+			Complications.exitTo(new Complications.Id(
+				Complications.COMPLICATION_TYPE_CURRENT_WEATHER));
+			return true;
+		case FIELD_TYPE_PRESSURE:
+			Complications.exitTo(new Complications.Id(
+				Complications.COMPLICATION_TYPE_SEA_LEVEL_PRESSURE));
+			return true;
+		case FIELD_TYPE_HUMIDITY:
+			return false;
+		}
+
+		return false;
+	}
+
+	function getWeatherIconFromGarmin(weather as Number or Null) as String
+	{
+		if (weather == null)
+		{
+			return "01"; // sunny
+		}
+		// these are pretty poor conversions to https://openweathermap.org/weather-conditions
+		// so we can use the same icon set, might need to adjust this in the future
+		switch(weather)
+		{
+			case Weather.CONDITION_CLEAR:
+				return "01";
+			case Weather.CONDITION_PARTLY_CLOUDY:
+				return "02";
+			case Weather.CONDITION_MOSTLY_CLOUDY:
+				return "03";
+			case Weather.CONDITION_RAIN:
+				return "10";
+			case Weather.CONDITION_SNOW:
+				return "13";
+			case Weather.CONDITION_WINDY:
+				return "50";
+			case Weather.CONDITION_THUNDERSTORMS:
+				return "11";
+			case Weather.CONDITION_WINTRY_MIX:
+				return "13";
+			case Weather.CONDITION_FOG:
+				return "03";
+			case Weather.CONDITION_HAZY:
+				return "04";
+			case Weather.CONDITION_HAIL:
+				return "11";
+			case Weather.CONDITION_SCATTERED_SHOWERS:
+				return "09";
+			case Weather.CONDITION_SCATTERED_THUNDERSTORMS:
+				return "11";
+			case Weather.CONDITION_UNKNOWN_PRECIPITATION:
+				return "09";
+			case Weather.CONDITION_LIGHT_RAIN:
+				return "09";
+			case Weather.CONDITION_HEAVY_RAIN:
+				return "10";
+			case Weather.CONDITION_LIGHT_SNOW:
+				return "13";
+			case Weather.CONDITION_HEAVY_SNOW:
+				return "13";
+			case Weather.CONDITION_LIGHT_RAIN_SNOW:
+				return "13";
+			case Weather.CONDITION_HEAVY_RAIN_SNOW:
+				return "13";
+			case Weather.CONDITION_CLOUDY:
+				return "02";
+			case Weather.CONDITION_RAIN_SNOW:
+				return "13";
+			case Weather.CONDITION_PARTLY_CLEAR:
+				return "02";
+			case Weather.CONDITION_MOSTLY_CLEAR:
+				return "01";
+			case Weather.CONDITION_LIGHT_SHOWERS:
+				return "09";
+			case Weather.CONDITION_SHOWERS:
+				return "09";
+			case Weather.CONDITION_HEAVY_SHOWERS:
+				return "10";
+			case Weather.CONDITION_CHANCE_OF_SHOWERS:
+				return "09";
+			case Weather.CONDITION_CHANCE_OF_THUNDERSTORMS:
+				return "11";
+			case Weather.CONDITION_MIST:
+				return "50";
+			case Weather.CONDITION_DUST:
+				return "50";
+			case Weather.CONDITION_DRIZZLE:
+				return "09";
+			case Weather.CONDITION_TORNADO:
+				return "11";
+			case Weather.CONDITION_SMOKE:
+				return "50";
+			case Weather.CONDITION_ICE:
+				return "13";
+			case Weather.CONDITION_SAND:
+				return "50";
+			case Weather.CONDITION_SQUALL:
+				return "50";
+			case Weather.CONDITION_SANDSTORM:
+				return "50";
+			case Weather.CONDITION_VOLCANIC_ASH:
+				return "50";
+			case Weather.CONDITION_HAZE:
+				return "50";
+			case Weather.CONDITION_FAIR:
+				return "01";
+			case Weather.CONDITION_HURRICANE:
+				return "11";
+			case Weather.CONDITION_TROPICAL_STORM:
+				return "11";
+			case Weather.CONDITION_CHANCE_OF_SNOW:
+				return "13";
+			case Weather.CONDITION_CHANCE_OF_RAIN_SNOW:
+				return "13";
+			case Weather.CONDITION_CLOUDY_CHANCE_OF_RAIN:
+				return "03";
+			case Weather.CONDITION_CLOUDY_CHANCE_OF_SNOW:
+				return "13";
+			case Weather.CONDITION_CLOUDY_CHANCE_OF_RAIN_SNOW:
+				return "13";
+			case Weather.CONDITION_FLURRIES:
+				return "11";
+			case Weather.CONDITION_FREEZING_RAIN:
+				return "11";
+			case Weather.CONDITION_SLEET:
+				return "13";
+			case Weather.CONDITION_ICE_SNOW:
+				return "13";
+			case Weather.CONDITION_THIN_CLOUDS:
+				return "02";
+			case Weather.CONDITION_UNKNOWN:
+				return "01";
+		}
+
+		return "01"; // sunny
 	}
 }

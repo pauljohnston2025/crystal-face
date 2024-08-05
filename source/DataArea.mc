@@ -6,6 +6,7 @@ using Toybox.Time;
 using Toybox.Time.Gregorian;
 
 import Toybox.Lang;
+import Toybox.Complications;
 
 class DataArea extends Ui.Drawable {
 
@@ -204,5 +205,55 @@ class DataArea extends Ui.Drawable {
 				);
 			}
 		}
+	}
+
+	function handleTouch(x as Number, y as Number) as Boolean {
+		// these have text and an icon, but are justified left/right
+		// todo could calculate this from text/icon hight if we have adccess to DC
+		var iconAndTextLimit = 100;
+		var heightLimit = 50;
+		if (y < mGoalIconY || y > mGoalIconY + heightLimit) {
+			return false;
+		}
+
+		if (x > mGoalIconLeftX && x < mGoalIconLeftX + iconAndTextLimit) {
+			// todo get goal type from DataArea or CrystalView class
+			return launchGoalType(mLeftGoalType);
+		} else if (x > mGoalIconRightX - iconAndTextLimit && x < mGoalIconRightX) {
+			// todo get goal type from DataArea or CrystalView class
+			return launchGoalType(mRightGoalType);
+		}
+
+		return false;
+	}
+
+	function launchGoalType(goalType as Number) as Boolean {
+		switch (goalType) {
+		case GOAL_TYPE_BATTERY:
+			Complications.exitTo(
+				new Complications.Id(Complications.COMPLICATION_TYPE_SUNRISE));
+			return true;
+
+		case GOAL_TYPE_CALORIES:
+			Complications.exitTo(
+				new Complications.Id(Complications.COMPLICATION_TYPE_CALORIES));
+			return true;
+		case GOAL_TYPE_OFF:
+			return false;
+		case GOAL_TYPE_STEPS:
+			Complications.exitTo(
+				new Complications.Id(Complications.COMPLICATION_TYPE_STEPS));
+			return true;
+		case GOAL_TYPE_FLOORS_CLIMBED:
+			Complications.exitTo(new Complications.Id(
+				Complications.COMPLICATION_TYPE_FLOORS_CLIMBED));
+			return true;
+		case GOAL_TYPE_ACTIVE_MINUTES:
+			Complications.exitTo(new Complications.Id(
+				Complications.COMPLICATION_TYPE_INTENSITY_MINUTES));
+			return true;
+		}
+
+		return false;
 	}
 }
