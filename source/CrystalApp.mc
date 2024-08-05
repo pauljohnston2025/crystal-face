@@ -90,8 +90,9 @@ class CrystalApp extends App.AppBase {
 
 	// Return the initial view of your application here
 	function getInitialView() {
-		mView = new CrystalView();
-		mTouch = new CrystalDelegate();
+		var drawableCache = new DrawableCache();
+		mView = new CrystalView(drawableCache);
+		mTouch = new CrystalDelegate(drawableCache);
 		onSettingsChanged(); // After creating view.
 		return [mView, mTouch];
 	}
