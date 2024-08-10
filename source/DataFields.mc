@@ -784,45 +784,54 @@ class DataFields extends Ui.Drawable {
 
 	function handleTouch(x as Number, y as Number) as Boolean {
 		var fieldTypes = App.getApp().mFieldTypes;
-		var heightLimit = 11;
+		var heightLimit = 30;
 		if (y < mTop - heightLimit || y > mBottom + heightLimit) {
 			return false;
 		}
 
 		switch (mFieldCount) {
 		case 3:
-			var middleX = (mRight + mLeft) / 2;
+		{
+			var widthLimit = (mRight - mLeft) / 4; // half the width between the fields (they are 0.5 appart)
+			var middleX = (mRight + mLeft) / 2; // this is the same as mLeft + (mRight - mLeft)/2 ie. half way point
 			// field 1
-			if (x > mLeft - 11 && x < mLeft + 25 - 11) {
+			if (x > mLeft - widthLimit && x < mLeft + widthLimit) {
 				return launchFieldType(fieldTypes[0]);
 			}
 			// field 2
-			else if (x > middleX - 11 && x < middleX + 25 - 11) {
+			else if (x > middleX - widthLimit && x < middleX + widthLimit) {
 				return launchFieldType(fieldTypes[1]);
 			}
 			// field 3
-			else if (x > mRight - 11 && x < mRight + 25 - 11) {
+			else if (x > mRight - widthLimit && x < mRight + widthLimit) {
 				return launchFieldType(fieldTypes[2]);
 			}
 			return false;
+		}
 		case 2:
+		{
+			var widthLimit = (mRight - mLeft) * 0.35; // half the width between the 2 fields (they are 0.7 appart)
 			var leftX = mLeft + ((mRight - mLeft) * 0.15);
 			var rightX = mLeft + ((mRight - mLeft) * 0.85);
 			// field 1
-			if (x > leftX - 11 && x < leftX + 25 - 11) {
+			if (x > leftX - widthLimit && x < leftX + widthLimit) {
 				return launchFieldType(fieldTypes[0]);
 			}
 			// field 2
-			else if (x > rightX - 11 && x < rightX + 25 - 11) {
+			else if (x > rightX - widthLimit && x < rightX + widthLimit) {
 				return launchFieldType(fieldTypes[1]);
 			}
 			return false;
+		}
 		case 1:
+		{
+			var widthLimit = (mRight - mLeft) / 2; // entire width of data field area allowed to select
 			var xPos = (mRight + mLeft) / 2;
-			if (x > xPos - 11 && x < xPos + 25 - 11) {
+			if (x > xPos - widthLimit && x < xPos + widthLimit) {
 				return launchFieldType(fieldTypes[0]);
 			}
 			return false;
+		}
 		}
 
 		return false;

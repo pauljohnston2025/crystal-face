@@ -185,8 +185,8 @@ class Indicators extends Ui.Drawable {
 
 	(:horizontal_indicators)
 	function handleTouch(x as Number, y as Number) as Boolean {
-		var heightLimit = 11;
-		var widthLimit = 11;
+		var widthLimit = mSpacing / 2;
+		var heightLimit = mSpacing / 2;
 		if (y < locY - heightLimit || y > locY + heightLimit) {
 			return false;
 		}
@@ -237,8 +237,8 @@ class Indicators extends Ui.Drawable {
 	
 	(:vertical_indicators)
 	function handleTouch(x as Number, y as Number) as Boolean {
-		var heightLimit = 11;
-		var widthLimit = 11;
+		var widthLimit = mBatteryWidth / 2; // battery bar shoulld be a good indicator for available space
+		var heightLimit = mSpacing / 2; // the icons always seem to be mSpacing appart, half the distance so we can do +-
 		if (x < locX - widthLimit || x > locX + widthLimit) {
 			return false;
 		}
