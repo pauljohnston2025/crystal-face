@@ -1,3 +1,7 @@
+Forked from https://github.com/warmsound/crystal-face.git and added touch support
+Also added Complications for weather and a bunch of other things
+minimal changes otherwise
+
 # Crystal
 A Garmin Connect IQ watch face.
 
