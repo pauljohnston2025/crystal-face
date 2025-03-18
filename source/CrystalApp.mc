@@ -8,6 +8,7 @@ using Toybox.Application.Properties as Properties;
 
 import Toybox.Lang;
 import Toybox.Application;
+import Toybox.WatchUi;
 
 typedef PendingWebRequests as Dictionary<String, Boolean>;
 
@@ -71,7 +72,7 @@ function deleteStorageValue(key as PropertyKeyType) as Void {
 class CrystalApp extends App.AppBase {
 
 	var mView;
-	var mTouch;
+	var mTouch as Null or WatchUi.WatchFaceDelegate;
 	var mFieldTypes as Array<Number> = [0,0,0];
 
 	function initialize() {
@@ -92,9 +93,15 @@ class CrystalApp extends App.AppBase {
 	function getInitialView() {
 		var drawableCache = new DrawableCache();
 		mView = new CrystalView(drawableCache);
-		mTouch = new CrystalDelegate(drawableCache);
+		mTouch = null;
 		onSettingsChanged(); // After creating view.
-		return [mView, mTouch];
+
+		if (Sys.getDeviceSettings().isTouchScreen)
+		{
+			mTouch = new CrystalDelegate(drawableCache);
+			return [mView, mTouch];
+		}
+		return [mView];
 	}
 
 	function getView() {
